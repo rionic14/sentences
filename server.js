@@ -251,7 +251,7 @@ function targetForRound(round) {
 }
 
 function intervalForRound(round) {
-  return ({ 2: 1, 3: 4, 4: 8, 5: 16, 6: 32, 7: 64, 8: 128 })[round];
+  return ({ 2: 1, 3: 2, 4: 4, 5: 8, 6: 16, 7: 32, 8: 64 })[round];
 }
 
 function studyDate(date = new Date()) {
