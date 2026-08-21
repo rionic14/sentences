@@ -93,7 +93,7 @@ app.get("/api/sentences", (_req, res) => {
   const rows = db.prepare(`
     SELECT * FROM sentences
     ORDER BY CASE WHEN status = 'completed' THEN 1 ELSE 0 END,
-      next_review_date ASC, created_at ASC
+      current_round DESC, next_review_date ASC, created_at ASC
   `).all();
   res.json({ sentences: rows.map((row) => presentSentence(row, today)), studyDate: today });
 });
