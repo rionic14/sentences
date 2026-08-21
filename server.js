@@ -24,6 +24,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT NOT NULL,
     video_file TEXT NOT NULL,
+    video_original_name TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     current_round INTEGER NOT NULL DEFAULT 1 CHECK(current_round BETWEEN 1 AND 8),
@@ -45,6 +46,10 @@ db.exec(`
     UNIQUE(sentence_id, round)
   );
 `);
+
+if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.name === "video_original_name")) {
+  db.exec("ALTER TABLE sentences ADD COLUMN video_original_name TEXT");
+}
 
 const app = express();
 app.use(express.json());
@@ -108,9 +113,9 @@ app.post("/api/sentences", upload.single("video"), (req, res, next) => {
   try {
     const now = new Date().toISOString();
     const result = db.prepare(`
-      INSERT INTO sentences (text, video_file, created_at, updated_at, next_review_date)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(text, req.file?.filename || "", now, now, studyDate());
+      INSERT INTO sentences (text, video_file, video_original_name, created_at, updated_at, next_review_date)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(text, req.file?.filename || "", req.file?.originalname || null, now, now, studyDate());
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (error) {
     if (req.file) safeUnlink(path.join(videoPath, req.file.filename));
@@ -127,8 +132,8 @@ app.post("/api/sentences/:id/video", upload.single("video"), (req, res, next) =>
       safeUnlink(path.join(videoPath, req.file.filename));
       throw httpError(404, "문장을 찾을 수 없습니다.");
     }
-    db.prepare("UPDATE sentences SET video_file = ?, updated_at = ? WHERE id = ?")
-      .run(req.file.filename, new Date().toISOString(), id);
+    db.prepare("UPDATE sentences SET video_file = ?, video_original_name = ?, updated_at = ? WHERE id = ?")
+      .run(req.file.filename, req.file.originalname, new Date().toISOString(), id);
     if (sentence.video_file) safeUnlink(path.join(videoPath, sentence.video_file));
     res.json({ sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) });
   } catch (error) {
@@ -270,6 +275,7 @@ function presentSentence(row, today) {
   return {
     id: row.id,
     text: row.text,
+    videoFile: row.video_file ? (row.video_original_name || row.video_file) : null,
     videoUrl: row.video_file ? `/videos/${encodeURIComponent(row.video_file)}` : null,
     createdAt: row.created_at,
     currentRound: row.current_round,

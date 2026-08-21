@@ -88,7 +88,9 @@ function openDialog(sentence) {
   currentRound = sentence.currentRound;
   dialogVideo.value = "";
   selectedVideo = null;
-  videoPickerLabel.textContent = sentence.videoUrl ? "영상 교체 · 끌어 놓기 가능" : "영상 추가 · 끌어 놓기 가능";
+  videoPickerLabel.textContent = sentence.videoFile
+    ? `현재 영상: ${sentence.videoFile} · 교체하려면 선택/드롭`
+    : "현재 영상 없음 · 추가하려면 선택/드롭";
   setDays(remainingDays);
   setRound(currentRound);
   dialogMeta.textContent = `현재 ${sentence.currentRepeatCount}/${sentence.targetRepeatCount}회 반복 · 총 ${sentence.totalRepeatCount}회`;
@@ -160,7 +162,11 @@ function showMessage(text, error = false) {
 
 function setSelectedVideo(file) {
   selectedVideo = file;
-  videoPickerLabel.textContent = file?.name || (selected?.videoUrl ? "영상 교체 · 끌어 놓기 가능" : "영상 추가 · 끌어 놓기 가능");
+  videoPickerLabel.textContent = file
+    ? `저장할 영상: ${file.name}`
+    : selected?.videoFile
+      ? `현재 영상: ${selected.videoFile} · 교체하려면 선택/드롭`
+      : "현재 영상 없음 · 추가하려면 선택/드롭";
   dialogMeta.classList.remove("error");
   if (file) dialogMeta.textContent = `${file.name} 선택됨`;
 }
