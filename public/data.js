@@ -9,9 +9,12 @@ const dialogVideo = document.querySelector("#dialogVideo");
 const videoPickerLabel = document.querySelector("#videoPickerLabel");
 let selected = null;
 let remainingDays = 0;
+let currentRound = 1;
 
 document.querySelector("#dayMinus").addEventListener("click", () => setDays(remainingDays - 1));
 document.querySelector("#dayPlus").addEventListener("click", () => setDays(remainingDays + 1));
+document.querySelector("#roundMinus").addEventListener("click", () => setRound(currentRound - 1));
+document.querySelector("#roundPlus").addEventListener("click", () => setRound(currentRound + 1));
 document.querySelector("#cancelButton").addEventListener("click", () => dialog.close());
 document.querySelector("#deleteButton").addEventListener("click", deleteSelected);
 form.addEventListener("submit", saveSelected);
@@ -35,8 +38,13 @@ function createRow(sentence) {
   button.type = "button";
   button.className = `data-row${sentence.remainingDays < 0 ? " overdue" : ""}`;
   const text = document.createElement("span");
-  text.className = "row-text";
-  text.textContent = sentence.text;
+  text.className = "row-content";
+  const sentenceText = document.createElement("span");
+  sentenceText.className = "row-text";
+  sentenceText.textContent = sentence.text;
+  const progress = document.createElement("small");
+  progress.textContent = `${sentence.currentRound}/8회차 · ${sentence.currentRepeatCount}/${sentence.targetRepeatCount}회 반복 · 총 ${sentence.totalRepeatCount}회`;
+  text.append(sentenceText, progress);
   const days = document.createElement("span");
   days.className = "days";
   days.textContent = dayLabel(sentence);
@@ -56,10 +64,12 @@ function openDialog(sentence) {
   selected = sentence;
   dialogText.value = sentence.text;
   remainingDays = sentence.remainingDays ?? 0;
+  currentRound = sentence.currentRound;
   dialogVideo.value = "";
   videoPickerLabel.textContent = sentence.videoUrl ? "영상 교체" : "영상 추가";
   setDays(remainingDays);
-  dialogMeta.textContent = `${sentence.currentRound}/8회차 · 현재 ${sentence.currentRepeatCount}/${sentence.targetRepeatCount} · 총 ${sentence.totalRepeatCount}회`;
+  setRound(currentRound);
+  dialogMeta.textContent = `현재 ${sentence.currentRepeatCount}/${sentence.targetRepeatCount}회 반복 · 총 ${sentence.totalRepeatCount}회`;
   dialog.showModal();
 }
 
@@ -68,13 +78,20 @@ function setDays(value) {
   dayValue.textContent = `${remainingDays}일`;
 }
 
+function setRound(value) {
+  currentRound = Math.max(1, Math.min(8, value));
+  document.querySelector("#roundValue").textContent = `${currentRound}회차`;
+  document.querySelector("#roundMinus").disabled = currentRound === 1;
+  document.querySelector("#roundPlus").disabled = currentRound === 8;
+}
+
 async function saveSelected(event) {
   event.preventDefault();
   if (!selected) return;
   try {
     const response = await fetch(`/api/sentences/${selected.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: dialogText.value.trim(), remainingDays })
+      body: JSON.stringify({ text: dialogText.value.trim(), remainingDays, currentRound })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);

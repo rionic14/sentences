@@ -84,7 +84,9 @@ button { touch-action: manipulation; }
 .data-shell { width: min(100%, 720px); }
 .data-list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
 .data-row { width: 100%; min-height: 64px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: var(--surface); color: var(--text); text-align: left; }
+.data-row .row-content { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .data-row .row-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.data-row .row-content small { color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .data-row .days { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .data-row.overdue .days { color: var(--danger); }
 
@@ -95,6 +97,14 @@ dialog::backdrop { background: rgba(0,0,0,.72); }
 .video-picker { min-height: 52px; display: grid; place-items: center; border: 1px dashed var(--line); border-radius: 14px; background: var(--bg); color: var(--muted); cursor: pointer; padding: 10px; text-align: center; overflow-wrap: anywhere; }
 .video-picker input { display: none; }
 .drop-copy small { color: var(--muted); font-size: 12px; font-weight: 500; }
+.round-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.round-control > span { color: var(--muted); font-size: 13px; }
+.stepper { display: grid; grid-template-columns: 46px 76px 46px; align-items: center; text-align: center; }
+.stepper button { min-height: 44px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font-size: 22px; }
+.stepper button:first-child { border-radius: 12px 0 0 12px; }
+.stepper button:last-child { border-radius: 0 12px 12px 0; }
+.stepper button:disabled { opacity: .35; }
+.stepper strong { min-height: 44px; display: grid; place-items: center; border-block: 1px solid var(--line); font-size: 14px; }
 .day-control { display: grid; grid-template-columns: 56px 1fr 56px; gap: 10px; align-items: center; }
 .day-control button { min-height: 52px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--text); font-size: 24px; }
 .day-value { text-align: center; }

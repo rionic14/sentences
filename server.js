@@ -193,13 +193,20 @@ app.patch("/api/sentences/:id", (req, res, next) => {
 
     const text = req.body.text === undefined ? sentence.text : String(req.body.text).trim();
     const remainingDays = req.body.remainingDays === undefined ? null : Number(req.body.remainingDays);
+    const requestedRound = req.body.currentRound === undefined ? sentence.current_round : Number(req.body.currentRound);
     if (!text) throw httpError(400, "문장을 입력해 주세요.");
     if (remainingDays !== null && (!Number.isInteger(remainingDays) || remainingDays < -3650 || remainingDays > 3650)) {
       throw httpError(400, "남은 일수가 올바르지 않습니다.");
     }
+    if (!Number.isInteger(requestedRound) || requestedRound < 1 || requestedRound > 8) {
+      throw httpError(400, "회차는 1부터 8 사이여야 합니다.");
+    }
     const nextDate = remainingDays === null ? sentence.next_review_date : addStudyDays(studyDate(), remainingDays);
-    db.prepare("UPDATE sentences SET text = ?, next_review_date = ?, updated_at = ? WHERE id = ?")
-      .run(text, nextDate, new Date().toISOString(), id);
+    const nextRepeatCount = requestedRound === sentence.current_round ? sentence.current_repeat_count : 0;
+    db.prepare(`
+      UPDATE sentences SET text = ?, next_review_date = ?, current_round = ?,
+        current_repeat_count = ?, updated_at = ? WHERE id = ?
+    `).run(text, nextDate, requestedRound, nextRepeatCount, new Date().toISOString(), id);
     res.json({ sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) });
   } catch (error) { next(error); }
 });

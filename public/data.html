@@ -21,6 +21,14 @@
         <span id="videoPickerLabel">영상 추가 또는 교체</span>
         <input id="dialogVideo" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/webm">
       </label>
+      <div class="round-control">
+        <span>현재 회차</span>
+        <div class="stepper">
+          <button type="button" id="roundMinus" aria-label="회차 줄이기">−</button>
+          <strong id="roundValue">1회차</strong>
+          <button type="button" id="roundPlus" aria-label="회차 늘리기">＋</button>
+        </div>
+      </div>
       <div class="day-control">
         <button type="button" id="dayMinus" aria-label="하루 줄이기">−</button>
         <div class="day-value"><strong id="dayValue">0일</strong><span>남은 일수</span></div>
