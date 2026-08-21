@@ -100,9 +100,9 @@ app.get("/api/sentences", (_req, res) => {
 
 app.post("/api/sentences", upload.single("video"), (req, res, next) => {
   const text = String(req.body.text || "").trim();
-  if (!req.file || !text) {
+  if (!text) {
     if (req.file) safeUnlink(path.join(videoPath, req.file.filename));
-    return res.status(400).json({ error: "영상과 문장을 모두 입력해 주세요." });
+    return res.status(400).json({ error: "문장을 입력해 주세요." });
   }
 
   try {
@@ -110,10 +110,29 @@ app.post("/api/sentences", upload.single("video"), (req, res, next) => {
     const result = db.prepare(`
       INSERT INTO sentences (text, video_file, created_at, updated_at, next_review_date)
       VALUES (?, ?, ?, ?, ?)
-    `).run(text, req.file.filename, now, now, studyDate());
+    `).run(text, req.file?.filename || "", now, now, studyDate());
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (error) {
-    safeUnlink(path.join(videoPath, req.file.filename));
+    if (req.file) safeUnlink(path.join(videoPath, req.file.filename));
+    next(error);
+  }
+});
+
+app.post("/api/sentences/:id/video", upload.single("video"), (req, res, next) => {
+  if (!req.file) return res.status(400).json({ error: "추가할 영상을 선택해 주세요." });
+  try {
+    const id = Number(req.params.id);
+    const sentence = db.prepare("SELECT * FROM sentences WHERE id = ?").get(id);
+    if (!sentence) {
+      safeUnlink(path.join(videoPath, req.file.filename));
+      throw httpError(404, "문장을 찾을 수 없습니다.");
+    }
+    db.prepare("UPDATE sentences SET video_file = ?, updated_at = ? WHERE id = ?")
+      .run(req.file.filename, new Date().toISOString(), id);
+    if (sentence.video_file) safeUnlink(path.join(videoPath, sentence.video_file));
+    res.json({ sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) });
+  } catch (error) {
+    if (req.file) safeUnlink(path.join(videoPath, req.file.filename));
     next(error);
   }
 });
@@ -195,7 +214,7 @@ const removeSentence = db.transaction((id) => {
 app.delete("/api/sentences/:id", (req, res, next) => {
   try {
     const videoFile = removeSentence(Number(req.params.id));
-    safeUnlink(path.join(videoPath, videoFile));
+    if (videoFile) safeUnlink(path.join(videoPath, videoFile));
     res.status(204).end();
   } catch (error) { next(error); }
 });
@@ -244,7 +263,7 @@ function presentSentence(row, today) {
   return {
     id: row.id,
     text: row.text,
-    videoUrl: `/videos/${encodeURIComponent(row.video_file)}`,
+    videoUrl: row.video_file ? `/videos/${encodeURIComponent(row.video_file)}` : null,
     createdAt: row.created_at,
     currentRound: row.current_round,
     currentRepeatCount: row.current_repeat_count,

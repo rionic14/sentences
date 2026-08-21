@@ -1,6 +1,7 @@
 const elements = {
   videoFrame: document.querySelector("#videoFrame"),
   video: document.querySelector("#video"),
+  noVideo: document.querySelector("#noVideo"),
   sentence: document.querySelector("#sentence"),
   stats: document.querySelector("#stats"),
   counter: document.querySelector("#counter"),
@@ -16,6 +17,7 @@ let currentSentence = null;
 let changing = false;
 
 elements.videoFrame.addEventListener("click", async () => {
+  if (!currentSentence?.videoUrl) return;
   elements.video.currentTime = 0;
   try { await elements.video.play(); } catch { showMessage("재생할 수 없는 영상입니다.", true); }
 });
@@ -74,7 +76,18 @@ function render(data) {
       : "오늘 복습할 문장이 없습니다.";
     return;
   }
-  elements.video.src = sentence.videoUrl;
+  if (sentence.videoUrl) {
+    elements.video.src = sentence.videoUrl;
+    elements.video.hidden = false;
+    elements.noVideo.hidden = true;
+    document.querySelector(".video-hint").hidden = false;
+  } else {
+    elements.video.pause();
+    elements.video.removeAttribute("src");
+    elements.video.hidden = true;
+    elements.noVideo.hidden = false;
+    document.querySelector(".video-hint").hidden = true;
+  }
   elements.sentence.classList.remove("empty");
   elements.sentence.textContent = sentence.text;
   elements.target.textContent = sentence.targetRepeatCount;

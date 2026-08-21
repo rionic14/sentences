@@ -5,6 +5,8 @@ const form = document.querySelector("#manageForm");
 const dialogText = document.querySelector("#dialogText");
 const dayValue = document.querySelector("#dayValue");
 const dialogMeta = document.querySelector("#dialogMeta");
+const dialogVideo = document.querySelector("#dialogVideo");
+const videoPickerLabel = document.querySelector("#videoPickerLabel");
 let selected = null;
 let remainingDays = 0;
 
@@ -13,6 +15,9 @@ document.querySelector("#dayPlus").addEventListener("click", () => setDays(remai
 document.querySelector("#cancelButton").addEventListener("click", () => dialog.close());
 document.querySelector("#deleteButton").addEventListener("click", deleteSelected);
 form.addEventListener("submit", saveSelected);
+dialogVideo.addEventListener("change", () => {
+  videoPickerLabel.textContent = dialogVideo.files[0]?.name || (selected?.videoUrl ? "영상 교체" : "영상 추가");
+});
 loadData();
 
 async function loadData() {
@@ -51,6 +56,8 @@ function openDialog(sentence) {
   selected = sentence;
   dialogText.value = sentence.text;
   remainingDays = sentence.remainingDays ?? 0;
+  dialogVideo.value = "";
+  videoPickerLabel.textContent = sentence.videoUrl ? "영상 교체" : "영상 추가";
   setDays(remainingDays);
   dialogMeta.textContent = `${sentence.currentRound}/8회차 · 현재 ${sentence.currentRepeatCount}/${sentence.targetRepeatCount} · 총 ${sentence.totalRepeatCount}회`;
   dialog.showModal();
@@ -71,6 +78,14 @@ async function saveSelected(event) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
+    const video = dialogVideo.files[0];
+    if (video) {
+      const body = new FormData();
+      body.append("video", video);
+      const videoResponse = await fetch(`/api/sentences/${selected.id}/video`, { method: "POST", body });
+      const videoData = await videoResponse.json();
+      if (!videoResponse.ok) throw new Error(videoData.error);
+    }
     dialog.close();
     await loadData();
   } catch (error) { dialogMeta.textContent = error.message || "저장하지 못했습니다."; }

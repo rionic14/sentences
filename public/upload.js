@@ -28,15 +28,15 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const file = videoInput.files[0];
   const text = textInput.value.trim();
-  if (!file || !text) return setMessage("영상과 문장을 모두 입력해 주세요.", true);
-  if (!confirm(`이 문장을 업로드할까요?\n\n${text}\n\n영상: ${file.name}`)) return;
+  if (!text) return setMessage("문장을 입력해 주세요.", true);
+  if (!confirm(`이 문장을 업로드할까요?\n\n${text}\n\n영상: ${file?.name || "없음 (나중에 추가 가능)"}`)) return;
 
   submitButton.disabled = true;
   submitButton.textContent = "업로드 중…";
   setMessage("영상을 업로드하고 있습니다.");
   try {
     const body = new FormData();
-    body.append("video", file);
+    if (file) body.append("video", file);
     body.append("text", text);
     const response = await fetch("/api/sentences", { method: "POST", body });
     const data = await response.json();
