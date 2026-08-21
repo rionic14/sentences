@@ -7,9 +7,13 @@ const dayValue = document.querySelector("#dayValue");
 const dialogMeta = document.querySelector("#dialogMeta");
 const dialogVideo = document.querySelector("#dialogVideo");
 const videoPickerLabel = document.querySelector("#videoPickerLabel");
+const videoDropzone = document.querySelector("#videoDropzone");
+const manageSaveButton = document.querySelector("#manageSaveButton");
 let selected = null;
 let remainingDays = 0;
 let currentRound = 1;
+let selectedVideo = null;
+let saving = false;
 
 document.querySelector("#dayMinus").addEventListener("click", () => setDays(remainingDays - 1));
 document.querySelector("#dayPlus").addEventListener("click", () => setDays(remainingDays + 1));
@@ -19,7 +23,24 @@ document.querySelector("#cancelButton").addEventListener("click", () => dialog.c
 document.querySelector("#deleteButton").addEventListener("click", deleteSelected);
 form.addEventListener("submit", saveSelected);
 dialogVideo.addEventListener("change", () => {
-  videoPickerLabel.textContent = dialogVideo.files[0]?.name || (selected?.videoUrl ? "영상 교체" : "영상 추가");
+  setSelectedVideo(dialogVideo.files[0] || null);
+});
+["dragenter", "dragover"].forEach((name) => videoDropzone.addEventListener(name, (event) => {
+  event.preventDefault();
+  videoDropzone.classList.add("dragging");
+}));
+["dragleave", "drop"].forEach((name) => videoDropzone.addEventListener(name, (event) => {
+  event.preventDefault();
+  videoDropzone.classList.remove("dragging");
+}));
+videoDropzone.addEventListener("drop", (event) => {
+  const file = [...event.dataTransfer.files].find((item) => item.type.startsWith("video/"));
+  if (!file) {
+    dialogMeta.textContent = "영상 파일을 끌어 놓아 주세요.";
+    dialogMeta.classList.add("error");
+    return;
+  }
+  setSelectedVideo(file);
 });
 loadData();
 
@@ -66,10 +87,13 @@ function openDialog(sentence) {
   remainingDays = sentence.remainingDays ?? 0;
   currentRound = sentence.currentRound;
   dialogVideo.value = "";
-  videoPickerLabel.textContent = sentence.videoUrl ? "영상 교체" : "영상 추가";
+  selectedVideo = null;
+  videoPickerLabel.textContent = sentence.videoUrl ? "영상 교체 · 끌어 놓기 가능" : "영상 추가 · 끌어 놓기 가능";
   setDays(remainingDays);
   setRound(currentRound);
   dialogMeta.textContent = `현재 ${sentence.currentRepeatCount}/${sentence.targetRepeatCount}회 반복 · 총 ${sentence.totalRepeatCount}회`;
+  dialogMeta.classList.remove("error");
+  setSaving(false);
   dialog.showModal();
 }
 
@@ -87,7 +111,10 @@ function setRound(value) {
 
 async function saveSelected(event) {
   event.preventDefault();
-  if (!selected) return;
+  if (!selected || saving) return;
+  setSaving(true);
+  dialogMeta.classList.remove("error");
+  dialogMeta.textContent = selectedVideo ? "문장과 영상을 저장하고 있습니다…" : "변경 내용을 저장하고 있습니다…";
   try {
     const response = await fetch(`/api/sentences/${selected.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -95,7 +122,7 @@ async function saveSelected(event) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    const video = dialogVideo.files[0];
+    const video = selectedVideo;
     if (video) {
       const body = new FormData();
       body.append("video", video);
@@ -105,7 +132,12 @@ async function saveSelected(event) {
     }
     dialog.close();
     await loadData();
-  } catch (error) { dialogMeta.textContent = error.message || "저장하지 못했습니다."; }
+  } catch (error) {
+    dialogMeta.textContent = error.message || "저장하지 못했습니다.";
+    dialogMeta.classList.add("error");
+  } finally {
+    setSaving(false);
+  }
 }
 
 async function deleteSelected() {
@@ -124,4 +156,17 @@ async function deleteSelected() {
 function showMessage(text, error = false) {
   message.textContent = text;
   message.classList.toggle("error", error);
+}
+
+function setSelectedVideo(file) {
+  selectedVideo = file;
+  videoPickerLabel.textContent = file?.name || (selected?.videoUrl ? "영상 교체 · 끌어 놓기 가능" : "영상 추가 · 끌어 놓기 가능");
+  dialogMeta.classList.remove("error");
+  if (file) dialogMeta.textContent = `${file.name} 선택됨`;
+}
+
+function setSaving(value) {
+  saving = value;
+  manageSaveButton.disabled = value;
+  manageSaveButton.textContent = value ? "저장 중…" : "저장";
 }

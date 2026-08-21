@@ -17,7 +17,7 @@
   <dialog id="manageDialog">
     <form class="dialog-form" id="manageForm">
       <textarea id="dialogText" aria-label="문장"></textarea>
-      <label class="video-picker">
+      <label class="video-picker" id="videoDropzone">
         <span id="videoPickerLabel">영상 추가 또는 교체</span>
         <input id="dialogVideo" type="file" accept="video/mp4,video/quicktime,video/x-m4v,video/webm">
       </label>
@@ -37,7 +37,7 @@
       <p class="message" id="dialogMeta"></p>
       <div class="dialog-actions">
         <button class="secondary" id="cancelButton" type="button">취소</button>
-        <button class="primary" type="submit">저장</button>
+        <button class="primary" id="manageSaveButton" type="submit">저장</button>
       </div>
       <button class="danger full" id="deleteButton" type="button">문장과 영상 삭제</button>
     </form>

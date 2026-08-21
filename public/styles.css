@@ -90,11 +90,12 @@ button { touch-action: manipulation; }
 .data-row .days { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .data-row.overdue .days { color: var(--danger); }
 
-dialog { width: min(calc(100% - 28px), 520px); border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); padding: 20px; }
+dialog { width: min(calc(100% - 28px), 520px); max-height: calc(100dvh - 28px); overflow-y: auto; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--text); padding: 20px; }
 dialog::backdrop { background: rgba(0,0,0,.72); }
 .dialog-form { display: flex; flex-direction: column; gap: 16px; }
 .dialog-form textarea { width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--text); padding: 14px; line-height: 1.5; }
 .video-picker { min-height: 52px; display: grid; place-items: center; border: 1px dashed var(--line); border-radius: 14px; background: var(--bg); color: var(--muted); cursor: pointer; padding: 10px; text-align: center; overflow-wrap: anywhere; }
+.video-picker.dragging { border-color: var(--accent); background: rgba(114,227,166,.08); color: var(--text); }
 .video-picker input { display: none; }
 .drop-copy small { color: var(--muted); font-size: 12px; font-weight: 500; }
 .round-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
