@@ -1,0 +1,13 @@
+services:
+  sentences:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ${DATA_VOLUME_PATH:-./volume}:/data
+    environment:
+      DATA_VOLUME_PATH: /data
+      TZ: Asia/Seoul
+    restart: unless-stopped

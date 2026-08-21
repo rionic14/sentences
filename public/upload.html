@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f12">
+  <title>문장 업로드</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar"><a class="nav-link" href="/">← 돌아가기</a><h1>문장 업로드</h1></header>
+    <form class="upload-form" id="uploadForm">
+      <label class="dropzone" id="dropzone">
+        <input id="videoInput" type="file" name="video" accept="video/mp4,video/quicktime,video/x-m4v,video/webm" required>
+        <span class="drop-copy" id="dropCopy"><strong>영상 업로드</strong><span>터치하거나 영상을 끌어 놓으세요</span></span>
+        <video id="preview" playsinline controls hidden></video>
+      </label>
+      <textarea class="text-input" id="textInput" name="text" maxlength="5000" placeholder="외울 대사를 입력하세요" required></textarea>
+      <p class="message" id="message"></p>
+      <button class="primary full" id="submitButton" type="submit">업로드!</button>
+    </form>
+  </main>
+  <script type="module" src="/upload.js"></script>
+</body>
+</html>

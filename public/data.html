@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f12">
+  <title>데이터 관리</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell data-shell">
+    <header class="topbar"><a class="nav-link" href="/">← 돌아가기</a><h1>데이터 관리</h1></header>
+    <p class="message" id="message"></p>
+    <section class="data-list" id="dataList"></section>
+  </main>
+
+  <dialog id="manageDialog">
+    <form class="dialog-form" id="manageForm">
+      <textarea id="dialogText" aria-label="문장"></textarea>
+      <div class="day-control">
+        <button type="button" id="dayMinus" aria-label="하루 줄이기">−</button>
+        <div class="day-value"><strong id="dayValue">0일</strong><span>남은 일수</span></div>
+        <button type="button" id="dayPlus" aria-label="하루 늘리기">＋</button>
+      </div>
+      <p class="message" id="dialogMeta"></p>
+      <div class="dialog-actions">
+        <button class="secondary" id="cancelButton" type="button">취소</button>
+        <button class="primary" type="submit">저장</button>
+      </div>
+      <button class="danger full" id="deleteButton" type="button">문장과 영상 삭제</button>
+    </form>
+  </dialog>
+  <script type="module" src="/data.js"></script>
+</body>
+</html>
