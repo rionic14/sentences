@@ -29,6 +29,7 @@ db.exec(`
     updated_at TEXT NOT NULL,
     current_round INTEGER NOT NULL DEFAULT 1 CHECK(current_round BETWEEN 1 AND 8),
     current_repeat_count INTEGER NOT NULL DEFAULT 0 CHECK(current_repeat_count >= 0),
+    rotation_chunk_count INTEGER NOT NULL DEFAULT 0 CHECK(rotation_chunk_count BETWEEN 0 AND 9),
     total_repeat_count INTEGER NOT NULL DEFAULT 0 CHECK(total_repeat_count >= 0),
     registered_study_date TEXT,
     next_review_date TEXT,
@@ -46,6 +47,11 @@ db.exec(`
     completed_at TEXT NOT NULL,
     UNIQUE(sentence_id, round)
   );
+
+  CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.name === "video_original_name")) {
@@ -53,6 +59,9 @@ if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.na
 }
 if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.name === "registered_study_date")) {
   db.exec("ALTER TABLE sentences ADD COLUMN registered_study_date TEXT");
+}
+if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.name === "rotation_chunk_count")) {
+  db.exec("ALTER TABLE sentences ADD COLUMN rotation_chunk_count INTEGER NOT NULL DEFAULT 0");
 }
 
 const missingRegistrationDates = db.prepare(`
@@ -90,17 +99,20 @@ const upload = multer({
 
 app.get("/api/sentences/current", (_req, res) => {
   const today = studyDate();
-  const sentence = db.prepare(`
+  const candidates = db.prepare(`
     SELECT * FROM sentences
     WHERE status = 'active' AND next_review_date <= ?
     ORDER BY
-      CASE WHEN current_repeat_count % 10 <> 0 THEN 0 ELSE 1 END ASC,
-      CAST(current_repeat_count / 10 AS INTEGER) ASC,
-      current_round ASC,
-      next_review_date ASC,
-      created_at ASC
-    LIMIT 1
-  `).get(today);
+      CASE WHEN rotation_chunk_count > 0 THEN 0 ELSE 1 END ASC,
+      current_repeat_count ASC,
+      CASE current_round WHEN 1 THEN 100 WHEN 2 THEN 50 WHEN 3 THEN 30 ELSE 10 END DESC,
+      id ASC
+  `).all(today);
+  const inProgress = candidates.find((candidate) => candidate.rotation_chunk_count > 0);
+  const lastChunkSentenceId = getLastChunkSentenceId(today);
+  const sentence = inProgress
+    || candidates.find((candidate) => candidate.id !== lastChunkSentenceId)
+    || candidates[0];
 
   if (!sentence) {
     const next = db.prepare(`
@@ -174,6 +186,11 @@ const changeCount = db.transaction((id, delta) => {
   const nextCurrent = Math.max(0, Math.min(target, sentence.current_repeat_count + delta));
   const actualDelta = nextCurrent - sentence.current_repeat_count;
   const nextTotal = Math.max(0, sentence.total_repeat_count + actualDelta);
+  const nextChunkCount = actualDelta > 0
+    ? sentence.rotation_chunk_count + 1
+    : actualDelta < 0
+      ? Math.max(0, sentence.rotation_chunk_count - 1)
+      : sentence.rotation_chunk_count;
   const now = new Date().toISOString();
 
   if (actualDelta > 0 && nextCurrent === target) {
@@ -185,7 +202,8 @@ const changeCount = db.transaction((id, delta) => {
 
     if (sentence.current_round === 8) {
       db.prepare(`
-        UPDATE sentences SET current_repeat_count = ?, total_repeat_count = ?, status = 'completed',
+        UPDATE sentences SET current_repeat_count = ?, rotation_chunk_count = 0,
+          total_repeat_count = ?, status = 'completed',
           completed_at = ?, next_review_date = NULL, updated_at = ? WHERE id = ?
       `).run(nextCurrent, nextTotal, now, now, id);
       return { completed: true };
@@ -196,18 +214,25 @@ const changeCount = db.transaction((id, delta) => {
       || addStudyDays(sentence.next_review_date, -reviewDayOffset(sentence.current_round));
     const nextDate = addStudyDays(registrationDate, reviewDayOffset(nextRound));
     db.prepare(`
-      UPDATE sentences SET current_round = ?, current_repeat_count = 0, total_repeat_count = ?,
+      UPDATE sentences SET current_round = ?, current_repeat_count = 0, rotation_chunk_count = 0,
+        total_repeat_count = ?,
         next_review_date = ?, updated_at = ? WHERE id = ?
     `).run(nextRound, nextTotal, nextDate, now, id);
     return { roundCompleted: true, nextReviewDate: nextDate };
   }
 
-  db.prepare(`
-    UPDATE sentences SET current_repeat_count = ?, total_repeat_count = ?, updated_at = ? WHERE id = ?
-  `).run(nextCurrent, nextTotal, now, id);
-  if (actualDelta > 0 && nextCurrent > 0 && nextCurrent % 10 === 0) {
+  if (actualDelta > 0 && nextChunkCount >= 10) {
+    db.prepare(`
+      UPDATE sentences SET current_repeat_count = ?, rotation_chunk_count = 0,
+        total_repeat_count = ?, updated_at = ? WHERE id = ?
+    `).run(nextCurrent, nextTotal, now, id);
+    setLastChunkSentenceId(studyDate(), id);
     return { chunkCompleted: true };
   }
+  db.prepare(`
+    UPDATE sentences SET current_repeat_count = ?, rotation_chunk_count = ?,
+      total_repeat_count = ?, updated_at = ? WHERE id = ?
+  `).run(nextCurrent, nextChunkCount, nextTotal, now, id);
   return { sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) };
 });
 
@@ -242,7 +267,8 @@ app.patch("/api/sentences/:id", (req, res, next) => {
       : sentence.registered_study_date;
     db.prepare(`
       UPDATE sentences SET text = ?, next_review_date = ?, current_round = ?,
-        current_repeat_count = ?, registered_study_date = ?, updated_at = ? WHERE id = ?
+        current_repeat_count = ?, rotation_chunk_count = 0,
+        registered_study_date = ?, updated_at = ? WHERE id = ?
     `).run(text, nextDate, requestedRound, nextRepeatCount, registrationDate, new Date().toISOString(), id);
     res.json({ sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) });
   } catch (error) { next(error); }
@@ -316,6 +342,7 @@ function presentSentence(row, today) {
     createdAt: row.created_at,
     currentRound: row.current_round,
     currentRepeatCount: row.current_repeat_count,
+    rotationChunkCount: row.rotation_chunk_count,
     targetRepeatCount: targetForRound(row.current_round),
     totalRepeatCount: row.total_repeat_count,
     registeredStudyDate: row.registered_study_date,
@@ -331,6 +358,18 @@ function safeVideoExtension(name, mime) {
   const extension = path.extname(name).toLowerCase();
   if (allowed.has(extension)) return extension;
   return mime === "video/webm" ? ".webm" : ".mp4";
+}
+
+function getLastChunkSentenceId(date) {
+  const state = db.prepare("SELECT value FROM app_state WHERE key = ?").get(`last-chunk:${date}`);
+  return state ? Number(state.value) : null;
+}
+
+function setLastChunkSentenceId(date, sentenceId) {
+  db.prepare(`
+    INSERT INTO app_state (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(`last-chunk:${date}`, String(sentenceId));
 }
 
 function safeUnlink(file) {
