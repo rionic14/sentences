@@ -18,8 +18,16 @@ let changing = false;
 
 elements.videoFrame.addEventListener("click", async () => {
   if (!currentSentence?.videoUrl) return;
-  elements.video.currentTime = 0;
-  try { await elements.video.play(); } catch { showMessage("재생할 수 없는 영상입니다.", true); }
+  try {
+    if (elements.video.dataset.url !== currentSentence.videoUrl) {
+      elements.video.src = currentSentence.videoUrl;
+      elements.video.dataset.url = currentSentence.videoUrl;
+      elements.video.load();
+    } else {
+      elements.video.currentTime = 0;
+    }
+    await elements.video.play();
+  } catch { showMessage("재생할 수 없는 영상입니다.", true); }
 });
 elements.minus.addEventListener("click", () => changeCount(-1));
 elements.plus.addEventListener("click", () => changeCount(1));
@@ -70,6 +78,8 @@ function render(data) {
   if (!sentence) {
     elements.video.pause();
     elements.video.removeAttribute("src");
+    delete elements.video.dataset.url;
+    elements.video.load();
     elements.sentence.classList.add("empty");
     elements.sentence.textContent = data.nextReviewDate
       ? `오늘 복습할 문장이 없습니다.\n다음 복습: ${data.nextReviewDate}`
@@ -77,7 +87,10 @@ function render(data) {
     return;
   }
   if (sentence.videoUrl) {
-    elements.video.src = sentence.videoUrl;
+    elements.video.pause();
+    elements.video.removeAttribute("src");
+    delete elements.video.dataset.url;
+    elements.video.load();
     elements.video.hidden = false;
     elements.noVideo.hidden = true;
     document.querySelector(".video-hint").hidden = false;
