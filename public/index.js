@@ -19,13 +19,7 @@ let changing = false;
 elements.videoFrame.addEventListener("click", async () => {
   if (!currentSentence?.videoUrl) return;
   try {
-    if (elements.video.dataset.url !== currentSentence.videoUrl) {
-      elements.video.src = currentSentence.videoUrl;
-      elements.video.dataset.url = currentSentence.videoUrl;
-      elements.video.load();
-    } else {
-      elements.video.currentTime = 0;
-    }
+    elements.video.currentTime = 0;
     await elements.video.play();
   } catch { showMessage("재생할 수 없는 영상입니다.", true); }
 });
@@ -78,7 +72,6 @@ function render(data) {
   if (!sentence) {
     elements.video.pause();
     elements.video.removeAttribute("src");
-    delete elements.video.dataset.url;
     elements.video.load();
     elements.sentence.classList.add("empty");
     elements.sentence.textContent = data.nextReviewDate
@@ -88,8 +81,7 @@ function render(data) {
   }
   if (sentence.videoUrl) {
     elements.video.pause();
-    elements.video.removeAttribute("src");
-    delete elements.video.dataset.url;
+    elements.video.src = sentence.videoUrl;
     elements.video.load();
     elements.video.hidden = false;
     elements.noVideo.hidden = true;
