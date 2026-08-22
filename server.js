@@ -30,6 +30,7 @@ db.exec(`
     current_round INTEGER NOT NULL DEFAULT 1 CHECK(current_round BETWEEN 1 AND 8),
     current_repeat_count INTEGER NOT NULL DEFAULT 0 CHECK(current_repeat_count >= 0),
     total_repeat_count INTEGER NOT NULL DEFAULT 0 CHECK(total_repeat_count >= 0),
+    registered_study_date TEXT,
     next_review_date TEXT,
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'completed')),
     completed_at TEXT
@@ -50,6 +51,23 @@ db.exec(`
 if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.name === "video_original_name")) {
   db.exec("ALTER TABLE sentences ADD COLUMN video_original_name TEXT");
 }
+if (!db.prepare("PRAGMA table_info(sentences)").all().some((column) => column.name === "registered_study_date")) {
+  db.exec("ALTER TABLE sentences ADD COLUMN registered_study_date TEXT");
+}
+
+const missingRegistrationDates = db.prepare(`
+  SELECT id, created_at, current_round, next_review_date
+  FROM sentences WHERE registered_study_date IS NULL
+`).all();
+const setRegistrationDate = db.prepare("UPDATE sentences SET registered_study_date = ? WHERE id = ?");
+db.transaction(() => {
+  for (const sentence of missingRegistrationDates) {
+    const registrationDate = sentence.next_review_date
+      ? addStudyDays(sentence.next_review_date, -reviewDayOffset(sentence.current_round))
+      : studyDate(new Date(sentence.created_at));
+    setRegistrationDate.run(registrationDate, sentence.id);
+  }
+})();
 
 const app = express();
 app.use(express.json());
@@ -115,9 +133,10 @@ app.post("/api/sentences", upload.single("video"), (req, res, next) => {
   try {
     const now = new Date().toISOString();
     const result = db.prepare(`
-      INSERT INTO sentences (text, video_file, video_original_name, created_at, updated_at, next_review_date)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(text, req.file?.filename || "", req.file?.originalname || null, now, now, studyDate());
+      INSERT INTO sentences
+        (text, video_file, video_original_name, created_at, updated_at, registered_study_date, next_review_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(text, req.file?.filename || "", req.file?.originalname || null, now, now, studyDate(), studyDate());
     res.status(201).json({ id: result.lastInsertRowid });
   } catch (error) {
     if (req.file) safeUnlink(path.join(videoPath, req.file.filename));
@@ -170,7 +189,9 @@ const changeCount = db.transaction((id, delta) => {
     }
 
     const nextRound = sentence.current_round + 1;
-    const nextDate = addStudyDays(studyDate(), intervalForRound(nextRound));
+    const registrationDate = sentence.registered_study_date
+      || addStudyDays(sentence.next_review_date, -reviewDayOffset(sentence.current_round));
+    const nextDate = addStudyDays(registrationDate, reviewDayOffset(nextRound));
     db.prepare(`
       UPDATE sentences SET current_round = ?, current_repeat_count = 0, total_repeat_count = ?,
         next_review_date = ?, updated_at = ? WHERE id = ?
@@ -210,10 +231,13 @@ app.patch("/api/sentences/:id", (req, res, next) => {
     }
     const nextDate = remainingDays === null ? sentence.next_review_date : addStudyDays(studyDate(), remainingDays);
     const nextRepeatCount = requestedRound === sentence.current_round ? sentence.current_repeat_count : 0;
+    const registrationDate = nextDate
+      ? addStudyDays(nextDate, -reviewDayOffset(requestedRound))
+      : sentence.registered_study_date;
     db.prepare(`
       UPDATE sentences SET text = ?, next_review_date = ?, current_round = ?,
-        current_repeat_count = ?, updated_at = ? WHERE id = ?
-    `).run(text, nextDate, requestedRound, nextRepeatCount, new Date().toISOString(), id);
+        current_repeat_count = ?, registered_study_date = ?, updated_at = ? WHERE id = ?
+    `).run(text, nextDate, requestedRound, nextRepeatCount, registrationDate, new Date().toISOString(), id);
     res.json({ sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) });
   } catch (error) { next(error); }
 });
@@ -254,6 +278,10 @@ function intervalForRound(round) {
   return ({ 2: 1, 3: 2, 4: 4, 5: 8, 6: 16, 7: 32, 8: 64 })[round];
 }
 
+function reviewDayOffset(round) {
+  return ({ 1: 0, 2: 1, 3: 3, 4: 7, 5: 15, 6: 31, 7: 63, 8: 127 })[round];
+}
+
 function studyDate(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23"
@@ -284,6 +312,7 @@ function presentSentence(row, today) {
     currentRepeatCount: row.current_repeat_count,
     targetRepeatCount: targetForRound(row.current_round),
     totalRepeatCount: row.total_repeat_count,
+    registeredStudyDate: row.registered_study_date,
     nextReviewDate: row.next_review_date,
     remainingDays: row.next_review_date ? dateDifference(today, row.next_review_date) : null,
     status: row.status,
