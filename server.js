@@ -93,8 +93,11 @@ app.get("/api/sentences/current", (_req, res) => {
   const sentence = db.prepare(`
     SELECT * FROM sentences
     WHERE status = 'active' AND next_review_date <= ?
-    ORDER BY next_review_date ASC,
-      CASE current_round WHEN 1 THEN 100 WHEN 2 THEN 50 WHEN 3 THEN 30 ELSE 10 END DESC,
+    ORDER BY
+      CASE WHEN current_repeat_count % 10 <> 0 THEN 0 ELSE 1 END ASC,
+      CAST(current_repeat_count / 10 AS INTEGER) ASC,
+      current_round ASC,
+      next_review_date ASC,
       created_at ASC
     LIMIT 1
   `).get(today);
@@ -202,6 +205,9 @@ const changeCount = db.transaction((id, delta) => {
   db.prepare(`
     UPDATE sentences SET current_repeat_count = ?, total_repeat_count = ?, updated_at = ? WHERE id = ?
   `).run(nextCurrent, nextTotal, now, id);
+  if (actualDelta > 0 && nextCurrent > 0 && nextCurrent % 10 === 0) {
+    return { chunkCompleted: true };
+  }
   return { sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) };
 });
 

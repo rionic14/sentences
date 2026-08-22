@@ -50,7 +50,7 @@ async function changeCount(delta) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    if (data.roundCompleted || data.completed) return await loadCurrent();
+    if (data.chunkCompleted || data.roundCompleted || data.completed) return await loadCurrent();
     currentSentence = data.sentence;
     render({ sentence: currentSentence });
   } catch (error) {
