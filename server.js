@@ -103,12 +103,12 @@ app.get("/api/sentences/current", (_req, res) => {
     SELECT * FROM sentences
     WHERE status = 'active' AND next_review_date <= ?
     ORDER BY
-      CASE WHEN rotation_chunk_count > 0 THEN 0 ELSE 1 END ASC,
+      CASE WHEN current_repeat_count % 10 <> 0 THEN 0 ELSE 1 END ASC,
       current_repeat_count ASC,
       CASE current_round WHEN 1 THEN 100 WHEN 2 THEN 50 WHEN 3 THEN 30 ELSE 10 END DESC,
       id ASC
   `).all(today);
-  const inProgress = candidates.find((candidate) => candidate.rotation_chunk_count > 0);
+  const inProgress = candidates.find((candidate) => candidate.current_repeat_count % 10 !== 0);
   const lastChunkSentenceId = getLastChunkSentenceId(today);
   const sentence = inProgress
     || candidates.find((candidate) => candidate.id !== lastChunkSentenceId)
@@ -186,11 +186,6 @@ const changeCount = db.transaction((id, delta) => {
   const nextCurrent = Math.max(0, Math.min(target, sentence.current_repeat_count + delta));
   const actualDelta = nextCurrent - sentence.current_repeat_count;
   const nextTotal = Math.max(0, sentence.total_repeat_count + actualDelta);
-  const nextChunkCount = actualDelta > 0
-    ? sentence.rotation_chunk_count + 1
-    : actualDelta < 0
-      ? Math.max(0, sentence.rotation_chunk_count - 1)
-      : sentence.rotation_chunk_count;
   const now = new Date().toISOString();
 
   if (actualDelta > 0 && nextCurrent === target) {
@@ -221,7 +216,7 @@ const changeCount = db.transaction((id, delta) => {
     return { roundCompleted: true, nextReviewDate: nextDate };
   }
 
-  if (actualDelta > 0 && nextChunkCount >= 10) {
+  if (actualDelta > 0 && nextCurrent > 0 && nextCurrent % 10 === 0) {
     db.prepare(`
       UPDATE sentences SET current_repeat_count = ?, rotation_chunk_count = 0,
         total_repeat_count = ?, updated_at = ? WHERE id = ?
@@ -230,9 +225,9 @@ const changeCount = db.transaction((id, delta) => {
     return { chunkCompleted: true };
   }
   db.prepare(`
-    UPDATE sentences SET current_repeat_count = ?, rotation_chunk_count = ?,
+    UPDATE sentences SET current_repeat_count = ?, rotation_chunk_count = 0,
       total_repeat_count = ?, updated_at = ? WHERE id = ?
-  `).run(nextCurrent, nextChunkCount, nextTotal, now, id);
+  `).run(nextCurrent, nextTotal, now, id);
   return { sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) };
 });
 
