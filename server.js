@@ -103,16 +103,19 @@ app.get("/api/sentences/current", (_req, res) => {
     SELECT * FROM sentences
     WHERE status = 'active' AND next_review_date <= ?
     ORDER BY
+      next_review_date ASC,
       CASE WHEN current_repeat_count % 10 <> 0 THEN 0 ELSE 1 END ASC,
       current_repeat_count ASC,
       CASE current_round WHEN 1 THEN 100 WHEN 2 THEN 50 WHEN 3 THEN 30 ELSE 10 END DESC,
       id ASC
   `).all(today);
-  const inProgress = candidates.find((candidate) => candidate.current_repeat_count % 10 !== 0);
+  const priorityDate = candidates[0]?.next_review_date;
+  const prioritizedCandidates = candidates.filter((candidate) => candidate.next_review_date === priorityDate);
+  const inProgress = prioritizedCandidates.find((candidate) => candidate.current_repeat_count % 10 !== 0);
   const lastChunkSentenceId = getLastChunkSentenceId(today);
   const sentence = inProgress
-    || candidates.find((candidate) => candidate.id !== lastChunkSentenceId)
-    || candidates[0];
+    || prioritizedCandidates.find((candidate) => candidate.id !== lastChunkSentenceId)
+    || prioritizedCandidates[0];
 
   if (!sentence) {
     const next = db.prepare(`
@@ -248,6 +251,9 @@ app.patch("/api/sentences/:id", (req, res, next) => {
     const text = req.body.text === undefined ? sentence.text : String(req.body.text).trim();
     const remainingDays = req.body.remainingDays === undefined ? null : Number(req.body.remainingDays);
     const requestedRound = req.body.currentRound === undefined ? sentence.current_round : Number(req.body.currentRound);
+    const requestedRepeatCount = req.body.currentRepeatCount === undefined
+      ? (requestedRound === sentence.current_round ? sentence.current_repeat_count : 0)
+      : Number(req.body.currentRepeatCount);
     if (!text) throw httpError(400, "문장을 입력해 주세요.");
     if (remainingDays !== null && (!Number.isInteger(remainingDays) || remainingDays < -3650 || remainingDays > 3650)) {
       throw httpError(400, "남은 일수가 올바르지 않습니다.");
@@ -255,16 +261,24 @@ app.patch("/api/sentences/:id", (req, res, next) => {
     if (!Number.isInteger(requestedRound) || requestedRound < 1 || requestedRound > 8) {
       throw httpError(400, "회차는 1부터 8 사이여야 합니다.");
     }
+    const repeatLimit = targetForRound(requestedRound) - (sentence.status === "completed" ? 0 : 1);
+    if (!Number.isInteger(requestedRepeatCount) || requestedRepeatCount < 0 || requestedRepeatCount > repeatLimit) {
+      throw httpError(400, "현재 반복 횟수가 올바르지 않습니다.");
+    }
     const nextDate = remainingDays === null ? sentence.next_review_date : addStudyDays(studyDate(), remainingDays);
-    const nextRepeatCount = requestedRound === sentence.current_round ? sentence.current_repeat_count : 0;
+    const nextRepeatCount = requestedRepeatCount;
+    const nextTotalRepeatCount = requestedRound === sentence.current_round
+      ? sentence.total_repeat_count + nextRepeatCount - sentence.current_repeat_count
+      : sentence.total_repeat_count;
     const registrationDate = nextDate
       ? addStudyDays(nextDate, -reviewDayOffset(requestedRound))
       : sentence.registered_study_date;
     db.prepare(`
       UPDATE sentences SET text = ?, next_review_date = ?, current_round = ?,
         current_repeat_count = ?, rotation_chunk_count = 0,
-        registered_study_date = ?, updated_at = ? WHERE id = ?
-    `).run(text, nextDate, requestedRound, nextRepeatCount, registrationDate, new Date().toISOString(), id);
+        total_repeat_count = ?, registered_study_date = ?, updated_at = ? WHERE id = ?
+    `).run(text, nextDate, requestedRound, nextRepeatCount, sentence.current_round === requestedRound
+      ? nextTotalRepeatCount : sentence.total_repeat_count, registrationDate, new Date().toISOString(), id);
     res.json({ sentence: presentSentence(db.prepare("SELECT * FROM sentences WHERE id = ?").get(id), studyDate()) });
   } catch (error) { next(error); }
 });

@@ -4,6 +4,7 @@ const dialog = document.querySelector("#manageDialog");
 const form = document.querySelector("#manageForm");
 const dialogText = document.querySelector("#dialogText");
 const dayValue = document.querySelector("#dayValue");
+const repeatValue = document.querySelector("#repeatValue");
 const dialogMeta = document.querySelector("#dialogMeta");
 const dialogVideo = document.querySelector("#dialogVideo");
 const videoPickerLabel = document.querySelector("#videoPickerLabel");
@@ -12,6 +13,8 @@ const manageSaveButton = document.querySelector("#manageSaveButton");
 let selected = null;
 let remainingDays = 0;
 let currentRound = 1;
+let currentRepeatCount = 0;
+let maxRepeatCount = 0;
 let selectedVideo = null;
 let saving = false;
 
@@ -19,6 +22,8 @@ document.querySelector("#dayMinus").addEventListener("click", () => setDays(rema
 document.querySelector("#dayPlus").addEventListener("click", () => setDays(remainingDays + 1));
 document.querySelector("#roundMinus").addEventListener("click", () => setRound(currentRound - 1));
 document.querySelector("#roundPlus").addEventListener("click", () => setRound(currentRound + 1));
+document.querySelector("#repeatMinus").addEventListener("click", () => setRepeat(currentRepeatCount - 1));
+document.querySelector("#repeatPlus").addEventListener("click", () => setRepeat(currentRepeatCount + 1));
 document.querySelector("#cancelButton").addEventListener("click", () => dialog.close());
 document.querySelector("#deleteButton").addEventListener("click", deleteSelected);
 form.addEventListener("submit", saveSelected);
@@ -86,6 +91,7 @@ function openDialog(sentence) {
   dialogText.value = sentence.text;
   remainingDays = sentence.remainingDays ?? 0;
   currentRound = sentence.currentRound;
+  maxRepeatCount = sentence.targetRepeatCount - (sentence.status === "completed" ? 0 : 1);
   dialogVideo.value = "";
   selectedVideo = null;
   videoPickerLabel.textContent = sentence.videoFile
@@ -93,6 +99,7 @@ function openDialog(sentence) {
     : "현재 영상 없음 · 추가하려면 선택/드롭";
   setDays(remainingDays);
   setRound(currentRound);
+  setRepeat(sentence.currentRepeatCount);
   dialogMeta.textContent = `현재 ${sentence.currentRepeatCount}/${sentence.targetRepeatCount}회 반복 · 총 ${sentence.totalRepeatCount}회`;
   dialogMeta.classList.remove("error");
   setSaving(false);
@@ -106,9 +113,20 @@ function setDays(value) {
 
 function setRound(value) {
   currentRound = Math.max(1, Math.min(8, value));
+  const roundTarget = currentRound === 1 ? 100 : currentRound === 2 ? 50 : currentRound === 3 ? 30 : 10;
+  maxRepeatCount = roundTarget - (selected?.status === "completed" ? 0 : 1);
+  if (selected && currentRound !== selected.currentRound) currentRepeatCount = 0;
   document.querySelector("#roundValue").textContent = `${currentRound}회차`;
   document.querySelector("#roundMinus").disabled = currentRound === 1;
   document.querySelector("#roundPlus").disabled = currentRound === 8;
+  setRepeat(currentRepeatCount);
+}
+
+function setRepeat(value) {
+  currentRepeatCount = Math.max(0, Math.min(maxRepeatCount, value));
+  repeatValue.textContent = `${currentRepeatCount}회`;
+  document.querySelector("#repeatMinus").disabled = currentRepeatCount === 0;
+  document.querySelector("#repeatPlus").disabled = currentRepeatCount === maxRepeatCount;
 }
 
 async function saveSelected(event) {
@@ -120,7 +138,7 @@ async function saveSelected(event) {
   try {
     const response = await fetch(`/api/sentences/${selected.id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: dialogText.value.trim(), remainingDays, currentRound })
+      body: JSON.stringify({ text: dialogText.value.trim(), remainingDays, currentRound, currentRepeatCount })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
