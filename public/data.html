@@ -10,6 +10,15 @@
 <body>
   <main class="app-shell data-shell">
     <header class="topbar"><a class="nav-link" href="/">← 돌아가기</a><h1>데이터 관리</h1></header>
+    <section class="bulk-date-control" aria-label="전체 문장 일자 변경">
+      <span>전체 일자 변경</span>
+      <div class="bulk-date-actions">
+        <button type="button" id="bulkDayMinus" aria-label="전체 변경 일수 줄이기">−</button>
+        <strong id="bulkDayValue">0일</strong>
+        <button type="button" id="bulkDayPlus" aria-label="전체 변경 일수 늘리기">＋</button>
+        <button class="bulk-date-apply" type="button" id="bulkDayApply" disabled>적용</button>
+      </div>
+    </section>
     <p class="message" id="message"></p>
     <section class="data-list" id="dataList"></section>
   </main>

@@ -10,6 +10,8 @@ const dialogVideo = document.querySelector("#dialogVideo");
 const videoPickerLabel = document.querySelector("#videoPickerLabel");
 const videoDropzone = document.querySelector("#videoDropzone");
 const manageSaveButton = document.querySelector("#manageSaveButton");
+const bulkDayValue = document.querySelector("#bulkDayValue");
+const bulkDayApply = document.querySelector("#bulkDayApply");
 let selected = null;
 let remainingDays = 0;
 let currentRound = 1;
@@ -17,7 +19,12 @@ let currentRepeatCount = 0;
 let maxRepeatCount = 0;
 let selectedVideo = null;
 let saving = false;
+let bulkDays = 0;
+let bulkSaving = false;
 
+document.querySelector("#bulkDayMinus").addEventListener("click", () => setBulkDays(bulkDays - 1));
+document.querySelector("#bulkDayPlus").addEventListener("click", () => setBulkDays(bulkDays + 1));
+bulkDayApply.addEventListener("click", applyBulkDays);
 document.querySelector("#dayMinus").addEventListener("click", () => setDays(remainingDays - 1));
 document.querySelector("#dayPlus").addEventListener("click", () => setDays(remainingDays + 1));
 document.querySelector("#roundMinus").addEventListener("click", () => setRound(currentRound - 1));
@@ -48,6 +55,41 @@ videoDropzone.addEventListener("drop", (event) => {
   setSelectedVideo(file);
 });
 loadData();
+
+function setBulkDays(value) {
+  bulkDays = Math.max(-3650, Math.min(3650, value));
+  bulkDayValue.textContent = `${bulkDays > 0 ? "+" : ""}${bulkDays}일`;
+  bulkDayApply.disabled = bulkSaving || bulkDays === 0;
+}
+
+async function applyBulkDays() {
+  if (bulkSaving || bulkDays === 0) return;
+  const direction = bulkDays > 0 ? "뒤로" : "앞으로";
+  const days = Math.abs(bulkDays);
+  if (!confirm(`표시 여부와 관계없이 모든 문장의 일정을 ${days}일 ${direction} 이동할까요?`)) return;
+
+  bulkSaving = true;
+  bulkDayApply.disabled = true;
+  bulkDayApply.textContent = "변경 중…";
+  try {
+    const response = await fetch("/api/sentences/dates", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: bulkDays })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    setBulkDays(0);
+    await loadData();
+    showMessage(`전체 ${data.updatedCount}개 문장의 일정을 ${days}일 ${direction} 이동했습니다.`);
+  } catch (error) {
+    showMessage(error.message || "전체 일자를 변경하지 못했습니다.", true);
+  } finally {
+    bulkSaving = false;
+    bulkDayApply.textContent = "적용";
+    bulkDayApply.disabled = bulkDays === 0;
+  }
+}
 
 async function loadData() {
   try {

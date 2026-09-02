@@ -82,6 +82,14 @@ button { touch-action: manipulation; }
 .text-input:focus { border-color: var(--accent); }
 
 .data-shell { width: min(100%, 720px); }
+.bulk-date-control { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.bulk-date-control > span { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.bulk-date-actions { display: grid; grid-template-columns: 42px 58px 42px 58px; align-items: center; text-align: center; }
+.bulk-date-actions button { min-height: 40px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font-size: 20px; }
+.bulk-date-actions button:first-child { border-radius: 10px 0 0 10px; }
+.bulk-date-actions strong { min-height: 40px; display: grid; place-items: center; border-block: 1px solid var(--line); font-size: 13px; }
+.bulk-date-actions .bulk-date-apply { margin-left: 6px; border-radius: 10px; background: var(--accent); color: #092416; font-size: 13px; font-weight: 700; }
+.bulk-date-actions button:disabled { opacity: .35; }
 .data-list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; }
 .data-row { width: 100%; min-height: 64px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: var(--surface); color: var(--text); text-align: left; }
 .data-row .row-content { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -118,4 +126,9 @@ dialog::backdrop { background: rgba(0,0,0,.72); }
   .topbar { min-height: 34px; }
   .sentence-card { min-height: 90px; padding: 14px; }
   .counter .count-button { min-height: 58px; }
+}
+
+@media (max-width: 390px) {
+  .bulk-date-control { align-items: flex-start; flex-direction: column; }
+  .bulk-date-actions { align-self: stretch; grid-template-columns: 42px 1fr 42px 58px; }
 }

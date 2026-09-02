@@ -141,6 +141,33 @@ app.get("/api/sentences", (_req, res) => {
   res.json({ sentences: rows.map((row) => presentSentence(row, today)), studyDate: today });
 });
 
+const shiftAllSentenceDates = db.transaction((days) => {
+  const rows = db.prepare("SELECT id, registered_study_date, next_review_date FROM sentences").all();
+  const update = db.prepare(`
+    UPDATE sentences SET registered_study_date = ?, next_review_date = ?, updated_at = ? WHERE id = ?
+  `);
+  const now = new Date().toISOString();
+  for (const row of rows) {
+    update.run(
+      row.registered_study_date ? addStudyDays(row.registered_study_date, days) : null,
+      row.next_review_date ? addStudyDays(row.next_review_date, days) : null,
+      now,
+      row.id
+    );
+  }
+  return rows.length;
+});
+
+app.patch("/api/sentences/dates", (req, res, next) => {
+  try {
+    const days = Number(req.body.days);
+    if (!Number.isInteger(days) || days === 0 || days < -3650 || days > 3650) {
+      throw httpError(400, "변경 일수는 -3650일부터 3650일 사이의 0이 아닌 정수여야 합니다.");
+    }
+    res.json({ updatedCount: shiftAllSentenceDates(days), days });
+  } catch (error) { next(error); }
+});
+
 app.post("/api/sentences", upload.single("video"), (req, res, next) => {
   const text = String(req.body.text || "").trim();
   if (!text) {
